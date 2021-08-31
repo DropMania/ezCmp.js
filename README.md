@@ -7,7 +7,7 @@ Features:
 - kinda easy to use ;)
 
 ### Todo example
-```
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
