@@ -26,8 +26,7 @@ Features:
         mount: 'body',
         state:{
             todos: ['Go', 'Eat', 'Sleep'],
-            curTodo: '',
-            show: false
+            curTodo: ''
         },
         methods:{
             setCurTodo(evt){
