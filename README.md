@@ -15,7 +15,7 @@ Features:
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>EZ CMP IS GREAT!</title>
-        <script src="ezCmp.js"></script>
+        <script src="https://dropmania.github.io/ezCmp.js/ezCmp.js"></script>
     </head>
     <body>
     </body>
