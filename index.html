@@ -1,17 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <script src="ezCmp.js"></script>
-</head>
-<body>
-    <div id="container">
-    </div>
-    <div id="container2">
-    </div>
-    <script src="app.js"></script>
-</body>
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EZ CMP IS GREAT!</title>
+        <script src="https://dropmania.github.io/ezCmp.js/ezCmp.js"></script>
+    </head>
+    <body>
+    </body>
+    <script>
+        new ezCmp({
+            mount: 'body',
+            state: {
+                searchString: '',
+                images: [],
+                loading: false,
+            },
+            computed: {
+                imageCount(){
+                    return this.state.images.length;
+                }
+            },
+            methods: {
+                setSearchString(e) {
+                    this.state.searchString = e.target.value;
+                },
+                async search(e) {
+                    e.preventDefault();
+                    this.state.loading = true;
+                    let res = await fetch(`https://nature-image-api.vercel.app/search?q=${this.state.searchString}`)
+                    let data = await res.json();
+                    this.state.images = data.images;
+                    this.state.loading = false;
+                }
+            },
+            render: `
+                <h3>Image Search</h3>
+                <form onsubmit="search(event)">
+                <input placeholder="Search for an image" value="{searchString}" oninput="setSearchString(event)"/>
+                <br>
+                <if loading>
+                    Loading...
+                </if>
+                <if !loading>
+                    {imageCount} images found
+                    <div class="images">
+                        <loop images_image>
+                            <div>
+                                <img src="{image.image}" width="50px"/>
+                                {image.title}
+                            </div>
+                        </loop>
+                    </div>
+                </if>
+            `
+        })
+    </script>
 </html>
