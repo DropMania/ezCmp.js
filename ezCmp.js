@@ -70,7 +70,6 @@ function template(str, state,id,isChild = false){
             str = str.replace(new RegExp(`${e}="`,'g'),`${e}="components['${id}'].`)
         })
     }
-    console.log(str)
     let ifparts = str.split('</if>')
     ifparts.forEach((part,i)=>{
         let ifTag = part.match(/(<if.*?>)(.*)/s)
