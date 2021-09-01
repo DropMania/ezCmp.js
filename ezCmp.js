@@ -33,29 +33,6 @@ var cssPath = function(el) {
 }
 
 function template(str, state,id,isChild = false){
-    let ifparts = str.split('</if>')
-    ifparts.forEach((part,i)=>{
-        let ifTag = part.match(/(<if.*?>)(.*)/s)
-        if(ifTag){
-            let ifStartTag = ifTag[1].match(/<if\s*(.*)\s*>/)
-            let conditonvar = ifStartTag[1]
-            if(conditonvar.startsWith('!')){
-                conditonvar = conditonvar.slice(1)
-                if(!state[conditonvar]){
-                    part = part.replace(ifTag[0],ifTag[2])
-                }else{
-                    part = part.replace(ifTag[0],'')
-                }
-            }else{
-                if(state[conditonvar]){
-                    part = part.replace(ifTag[0],ifTag[2])
-                }else{
-                    part = part.replace(ifTag[0],'')
-                }
-            }
-            str = str.replace(ifTag[0],part)
-        }
-    })
     let loopparts = str.split('</loop>')
     loopparts.forEach((part,i)=>{
         let loopTag = part.match(/(<loop.*?>)(.*)/s)
@@ -66,7 +43,7 @@ function template(str, state,id,isChild = false){
             let loopArr = state[loopVar]
             let outStr = ''
             loopArr.forEach((item,index)=>{
-                outStr += template(loopStr, {[loopIdx]: item, [idx]:index},id,true)
+                outStr += template(loopStr, {[loopIdx]: item, [idx]:index, ...state},id,true)
             })
             str = str.replace(loopTag[0],outStr)
         }
@@ -93,22 +70,53 @@ function template(str, state,id,isChild = false){
             str = str.replace(new RegExp(`${e}="`,'g'),`${e}="components['${id}'].`)
         })
     }
+    console.log(str)
+    let ifparts = str.split('</if>')
+    ifparts.forEach((part,i)=>{
+        let ifTag = part.match(/(<if.*?>)(.*)/s)
+        if(ifTag){
+            let ifStartTag = ifTag[1].match(/<if\s*(.*)\s*>/)
+            part = ifTag[2]
+            let conditonvar = ifStartTag[1]
+            if(conditonvar.startsWith('!')){
+                conditonvar = conditonvar.slice(1)
+                if(!state[conditonvar]){
+                }else{
+                    part = part.replace(ifTag[2],'')
+                }
+            }else{
+                if(state[conditonvar]){
+                }else{
+                    part = part.replace(ifTag[2],'')
+                }
+            }
+            str = str.replace(ifTag[0],part)
+        }
+    })
     return str
 }
 let components = {};
 function ezCmp(config){
-    let {mount,state: data,render,methods,onMounted, onUpdated, name} = config;
+    let {mount,state: data,render,methods,onMounted, onUpdated, name, watch, computed} = config;
     name = name || randomString(10)
     components[name] = this
     let that = this
     data = data || {}
+    watch = watch || {}
+    computed = computed || {}
     onMounted = onMounted || function(){}
     let renderFn = render || function(){return ''}
     methods = methods || {}
     onUpdated = onUpdated || function(){}
     this.state = new Proxy(data, {
         set: function(target, key, value, receiver){
-            target[key] = value;
+            let commit = true
+            if(key in watch){
+                commit = watch[key].bind(that)(value,target[key])
+            }
+            if(commit != false){
+                target[key] = value;
+            }
             that.render()
             return true
         }
@@ -117,10 +125,14 @@ function ezCmp(config){
         this[fun] = methods[fun].bind(this)
     })
     this.render = function(){
+        let vars = {...this.state}
+        Object.keys(computed).forEach(fun=>{
+            vars[fun] = computed[fun].bind(this)()
+        })
         if(typeof renderFn === 'function'){
-            str = template(renderFn.bind(this)(), this.state, name)
+            str = template(renderFn.bind(this)(), vars, name)
         }else{
-            str = template(renderFn, this.state, name)
+            str = template(renderFn, vars, name)
         } 
         let path = cssPath(document.activeElement)
         let selNumber = 0
