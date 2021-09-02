@@ -5,13 +5,14 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>EZ CMP IS GREAT!</title>
-        <script src="https://dropmania.github.io/ezCmp.js/ezCmp.js"></script>
+        <script src="ezCmp.js"></script>
     </head>
     <body>
     </body>
     <script>
         new ezCmp({
             mount: 'body',
+            components: ['cmp2'],
             state: {
                 searchString: '',
                 images: [],
@@ -36,6 +37,7 @@
                 }
             },
             render: `
+                <div id="comp2" loading="{loading}"></div>
                 <h3>Image Search</h3>
                 <form onsubmit="search(event)">
                 <input placeholder="Search for an image" value="{searchString}" oninput="setSearchString(event)"/>
@@ -55,6 +57,19 @@
                     </div>
                 </if>
             `
+        })
+        new ezCmp({
+            mount: '#comp2',
+            name: 'cmp2',
+            state: {
+                name: 'test'
+            },
+            methods: {
+                changeName(){
+                    this.state.name = 'bernd'
+                }
+            },
+            render: `halo {name} {props.loading} <button onclick="changeName()">change</button>`
         })
     </script>
 </html>

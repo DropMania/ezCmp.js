@@ -96,17 +96,19 @@ function template(str, state,id,isChild = false){
 }
 let components = {};
 function ezCmp(config){
-    let {mount,state: data,render,methods,onMounted, onUpdated, name, watch, computed} = config;
+    let {mount,state: data,render,methods,onMounted, onUpdated, name, watch, computed, components:cmps} = config;
     name = name || randomString(10)
     components[name] = this
     let that = this
     data = data || {}
     watch = watch || {}
+    cmps = cmps || []
     computed = computed || {}
     onMounted = onMounted || function(){}
     let renderFn = render || function(){return ''}
     methods = methods || {}
     onUpdated = onUpdated || function(){}
+    let destinationEl = document.querySelector(mount)
     this.state = new Proxy(data, {
         set: function(target, key, value, receiver){
             let commit = true
@@ -128,6 +130,11 @@ function ezCmp(config){
         Object.keys(computed).forEach(fun=>{
             vars[fun] = computed[fun].bind(this)()
         })
+        vars.props = {}
+        destinationEl = document.querySelector(mount)
+        destinationEl.getAttributeNames().forEach(name=>{
+            vars.props = {...vars.props, [name]: destinationEl.getAttribute(name)}
+        })
         if(typeof renderFn === 'function'){
             str = template(renderFn.bind(this)(), vars, name)
         }else{
@@ -138,7 +145,10 @@ function ezCmp(config){
         'selectionStart' in document.activeElement ? 
             selNumber = document.activeElement.selectionStart 
             : ''
-        document.querySelector(mount).innerHTML = str
+        if(destinationEl){
+            
+            destinationEl.innerHTML = str
+        }
         let newFocusElement = document.querySelector(path)
         if(newFocusElement){
             'setSelectionRange' in newFocusElement
@@ -149,9 +159,14 @@ function ezCmp(config){
         if(onUpdated){
             onUpdated.bind(this)()
         }
+        cmps.forEach(cmp=>{
+            if(components[cmp]){
+                components[cmp].render()
+            }
+        })
     }
+    
     this.render()
-
     onMounted.bind(this)()
 
     return this
