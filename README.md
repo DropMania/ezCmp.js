@@ -1,7 +1,7 @@
 ## Welcome to ezCmp.js
 
 The worst Component framework you can think of ;D
-Features:
+#### Features:
 - Veeery slow and imperformant
 - really buggy
 - kinda easy to use ;)
