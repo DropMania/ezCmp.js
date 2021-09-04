@@ -1,5 +1,5 @@
 function randomString(len){
-    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     var str = ""
     for (var i = 0; i < len; i++) {
         str += chars.charAt(Math.floor(Math.random() * chars.length))
@@ -92,11 +92,28 @@ function template(str, state,id,isChild = false){
             str = str.replace(ifTag[0],part)
         }
     })
+    
+    let classRegex = Array.from(str.matchAll(/class="(.*?)"/g));
+    classRegex.forEach((match,i)=>{
+        if(match){
+            let classStr = match[1]
+            let classArr = classStr.split(' ')
+            classArr = classArr.map(item=>{
+                if(!item.startsWith('g-')){
+                    return `c-${id}-${item}`
+                }else{
+                    return item.slice(2)
+                }
+            })
+            str = str.replace(match[0],`class="${classArr.join(' ')}"`)
+        }
+    })
+    
     return str
 }
 let components = {};
 function ezCmp(config){
-    let {mount,state: data,render,methods,onMounted, onUpdated, name, watch, computed, components:cmps} = config;
+    let {mount,state: data,render,methods,onMounted, onUpdated, name, watch, computed, components:cmps,classes} = config;
     name = name || randomString(10)
     components[name] = this
     let that = this
@@ -108,7 +125,19 @@ function ezCmp(config){
     let renderFn = render || function(){return ''}
     methods = methods || {}
     onUpdated = onUpdated || function(){}
+    classes = classes || {}
     let destinationEl = document.querySelector(mount)
+    var style=document.createElement('style');
+    var classString = Object.keys(classes).map((c)=>{
+        let css = classes[c]
+        return `.c-${name}-${c}{${Object.keys(css).map(s=>{
+            let snakeCase = s.replace(/([A-Z])/g, function(g){return '-'+g.toLowerCase()})
+            return `${snakeCase}:${css[s]}`
+        }).join(';')}}`
+    }).join(' ')
+    style.appendChild(document.createTextNode(classString));
+    
+    document.getElementsByTagName('head')[0].appendChild(style);
     this.state = new Proxy(data, {
         set: function(target, key, value, receiver){
             let commit = true
