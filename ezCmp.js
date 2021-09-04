@@ -51,6 +51,43 @@ function template(str, state, id, isChild = false) {
             str = str.replace(loopTag[0], outStr)
         }
     })
+
+    /*  let ifArray = Array.from(str.matchAll(/(<if.*?>)(.*)(<\/if>)/gs))
+    ifArray.forEach((match, index) => {
+        let operation = match[1].match(/<if\s*(.*)\s*>/)[1]
+        let [left, operator, right] = operation.split('_')
+        let leftVal = state[left] || ''
+        console.log(ifArray)
+        operator = operator || ''
+        let rightVal = state[right] || ''
+        let result = eval(`${leftVal} ${operator} ${rightVal}`)
+        console.log(operation)
+        str = str.replace(match[0], result ? match[2] : '')
+    })
+ */
+
+    let ifparts = str.split('</if>')
+    ifparts.forEach((part, i) => {
+        let ifTag = part.match(/(<if.*?>)(.*)/s)
+        if (ifTag) {
+            let ifStartTag = ifTag[1].match(/<if\s*(.*)\s*>/)
+            part = ifTag[2]
+            let conditonvar = ifStartTag[1]
+            if (conditonvar.startsWith('!')) {
+                conditonvar = conditonvar.slice(1)
+                if (!state[conditonvar]) {
+                } else {
+                    part = part.replace(ifTag[2], '')
+                }
+            } else {
+                if (state[conditonvar]) {
+                } else {
+                    part = part.replace(ifTag[2], '')
+                }
+            }
+            str = str.replace(ifTag[0], part)
+        }
+    })
     let regex = /\{(.*?)\}/g
     let matches = str.match(regex)
     if (matches) {
@@ -76,28 +113,6 @@ function template(str, state, id, isChild = false) {
             )
         })
     }
-    let ifparts = str.split('</if>')
-    ifparts.forEach((part, i) => {
-        let ifTag = part.match(/(<if.*?>)(.*)/s)
-        if (ifTag) {
-            let ifStartTag = ifTag[1].match(/<if\s*(.*)\s*>/)
-            part = ifTag[2]
-            let conditonvar = ifStartTag[1]
-            if (conditonvar.startsWith('!')) {
-                conditonvar = conditonvar.slice(1)
-                if (!state[conditonvar]) {
-                } else {
-                    part = part.replace(ifTag[2], '')
-                }
-            } else {
-                if (state[conditonvar]) {
-                } else {
-                    part = part.replace(ifTag[2], '')
-                }
-            }
-            str = str.replace(ifTag[0], part)
-        }
-    })
 
     let classRegex = Array.from(str.matchAll(/class="(.*?)"/g))
     classRegex.forEach((match, i) => {
@@ -184,17 +199,19 @@ class ezCmp {
                 if (key in watch) {
                     commit = watch[key].bind(that)(value, target[key])
                 }
-                if (storage.includes(key)) {
-                    cmpStore[key] = value
-                    localStorage.setItem(
-                        'ezcmp-store',
-                        JSON.stringify({
-                            ...JSON.parse(localStorage.getItem('ezcmp-store')),
-                            [name]: cmpStore
-                        })
-                    )
-                }
                 if (commit != false) {
+                    if (storage.includes(key)) {
+                        cmpStore[key] = value
+                        localStorage.setItem(
+                            'ezcmp-store',
+                            JSON.stringify({
+                                ...JSON.parse(
+                                    localStorage.getItem('ezcmp-store')
+                                ),
+                                [name]: cmpStore
+                            })
+                        )
+                    }
                     target[key] = value
                     that.render()
                 }
@@ -253,7 +270,9 @@ class ezCmp {
             })
         }
         Object.keys(cmpStore).forEach((key) => {
-            this.state[key] = cmpStore[key]
+            if (storage.includes(key)) {
+                this.state[key] = cmpStore[key]
+            }
         })
         this.render()
         onMounted.bind(this)()
