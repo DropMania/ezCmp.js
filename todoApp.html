@@ -20,6 +20,7 @@
         new ezCmp({
             mount: 'body',
             components: ['cmp2'],
+            name: 'main',
             state: {
                 curTodo: '',
                 todos: [
@@ -28,6 +29,7 @@
                     { text: 'sleep', state: '' }
                 ]
             },
+            storage: ['todos'],
             computed: {
                 todoCount() {
                     return this.state.todos.length
@@ -94,12 +96,24 @@
         new ezCmp({
             mount: '#cmp2',
             name: 'cmp2',
+            state: {
+                value: 'lol'
+            },
+            storage: ['value'],
+            methods: {
+                setValue() {
+                    this.state.value = 'lmao'
+                }
+            },
             classes: {
                 blue: {
                     color: 'red'
                 }
             },
-            render: `<h1 class="blue">Hello Cmp2!</h1>`
+            render: `
+                <h1 class="blue">Hello Cmp2! {value}</h1> 
+                <button onclick="setValue()">set value</button>
+            `
         })
     </script>
 </html>

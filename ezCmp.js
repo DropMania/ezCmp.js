@@ -120,117 +120,144 @@ function template(str, state, id, isChild = false) {
     return str
 }
 let components = {}
-function ezCmp(config) {
-    let {
-        mount,
-        state: data,
-        render,
-        methods,
-        onMounted,
-        onUpdated,
-        name,
-        watch,
-        computed,
-        components: cmps,
-        classes
-    } = config
-    name = name || randomString(10)
-    components[name] = this
-    let that = this
-    data = data || {}
-    watch = watch || {}
-    cmps = cmps || []
-    computed = computed || {}
-    onMounted = onMounted || function () {}
-    let renderFn =
-        render ||
-        function () {
-            return ''
+if (!localStorage.getItem('ezcmp-store')) {
+    localStorage.setItem('ezcmp-store', JSON.stringify({}))
+}
+class ezCmp {
+    constructor(config) {
+        let {
+            mount,
+            state: data,
+            render,
+            methods,
+            onMounted,
+            onUpdated,
+            name,
+            watch,
+            computed,
+            components: cmps,
+            classes,
+            storage
+        } = config
+        name = name || randomString(10)
+        components[name] = this
+        let that = this
+        data = data || {}
+        watch = watch || {}
+        cmps = cmps || []
+        computed = computed || {}
+        onMounted = onMounted || function () {}
+        let renderFn =
+            render ||
+            function () {
+                return ''
+            }
+        methods = methods || {}
+        onUpdated = onUpdated || function () {}
+        classes = classes || {}
+        storage = storage || []
+        let destinationEl = document.querySelector(mount)
+        let cmpStore = {}
+        if (JSON.parse(localStorage.getItem('ezcmp-store'))[name]) {
+            cmpStore = JSON.parse(localStorage.getItem('ezcmp-store'))[name]
         }
-    methods = methods || {}
-    onUpdated = onUpdated || function () {}
-    classes = classes || {}
-    let destinationEl = document.querySelector(mount)
-    var style = document.createElement('style')
-    var classString = Object.keys(classes)
-        .map((c) => {
-            let css = classes[c]
-            return `.c-${name}-${c}{${Object.keys(css)
-                .map((s) => {
-                    let snakeCase = s.replace(/([A-Z])/g, function (g) {
-                        return '-' + g.toLowerCase()
+        var style = document.createElement('style')
+        var classString = Object.keys(classes)
+            .map((c) => {
+                let css = classes[c]
+                return `.c-${name}-${c}{${Object.keys(css)
+                    .map((s) => {
+                        let snakeCase = s.replace(/([A-Z])/g, function (g) {
+                            return '-' + g.toLowerCase()
+                        })
+                        return `${snakeCase}:${css[s]}`
                     })
-                    return `${snakeCase}:${css[s]}`
-                })
-                .join(';')}}`
-        })
-        .join(' ')
-    style.appendChild(document.createTextNode(classString))
+                    .join(';')}}`
+            })
+            .join(' ')
+        style.appendChild(document.createTextNode(classString))
 
-    document.getElementsByTagName('head')[0].appendChild(style)
-    this.state = new Proxy(data, {
-        set: function (target, key, value, receiver) {
-            let commit = true
-            if (key in watch) {
-                commit = watch[key].bind(that)(value, target[key])
-            }
-            if (commit != false) {
-                target[key] = value
-                that.render()
-            }
-            return true
-        }
-    })
-    Object.keys(methods).forEach((fun) => {
-        this[fun] = methods[fun].bind(this)
-    })
-    this.render = function () {
-        let vars = { ...this.state }
-        Object.keys(computed).forEach((fun) => {
-            vars[fun] = computed[fun].bind(this)()
-        })
-        vars.props = {}
-        destinationEl = document.querySelector(mount)
-        destinationEl.getAttributeNames().forEach((name) => {
-            vars.props = {
-                ...vars.props,
-                [name]: destinationEl.getAttribute(name)
+        document.getElementsByTagName('head')[0].appendChild(style)
+        this.state = new Proxy(data, {
+            set: function (target, key, value, receiver) {
+                let commit = true
+                if (key in watch) {
+                    commit = watch[key].bind(that)(value, target[key])
+                }
+                if (storage.includes(key)) {
+                    cmpStore[key] = value
+                    localStorage.setItem(
+                        'ezcmp-store',
+                        JSON.stringify({
+                            ...JSON.parse(localStorage.getItem('ezcmp-store')),
+                            [name]: cmpStore
+                        })
+                    )
+                }
+                if (commit != false) {
+                    target[key] = value
+                    that.render()
+                }
+                return true
             }
         })
-        if (typeof renderFn === 'function') {
-            str = template(renderFn.bind(this)(), vars, name)
-        } else {
-            str = template(renderFn, vars, name)
-        }
-        let path = cssPath(document.activeElement)
-        let selNumber = 0
-        'selectionStart' in document.activeElement
-            ? (selNumber = document.activeElement.selectionStart)
-            : ''
-        if (destinationEl) {
-            destinationEl.innerHTML = str
-        }
-        let newFocusElement = document.querySelector(path)
-        if (newFocusElement) {
-            try {
-                'setSelectionRange' in newFocusElement
-                    ? newFocusElement.setSelectionRange(selNumber, selNumber)
-                    : ''
-                newFocusElement.focus()
-            } catch (e) {}
-        }
-        if (onUpdated) {
-            onUpdated.bind(this)()
-        }
-        cmps.forEach((cmp) => {
-            if (components[cmp]) {
-                components[cmp].render()
-            }
+        Object.keys(methods).forEach((fun) => {
+            this[fun] = methods[fun].bind(this)
         })
+        this.render = function () {
+            let vars = { ...this.state }
+            Object.keys(computed).forEach((fun) => {
+                vars[fun] = computed[fun].bind(this)()
+            })
+            vars.props = {}
+            destinationEl = document.querySelector(mount)
+            destinationEl.getAttributeNames().forEach((name) => {
+                vars.props = {
+                    ...vars.props,
+                    [name]: destinationEl.getAttribute(name)
+                }
+            })
+            let str = ''
+            if (typeof renderFn === 'function') {
+                str = template(renderFn.bind(this)(), vars, name)
+            } else {
+                str = template(renderFn, vars, name)
+            }
+            let path = cssPath(document.activeElement)
+            let selNumber = 0
+            'selectionStart' in document.activeElement
+                ? (selNumber = document.activeElement.selectionStart)
+                : ''
+            if (destinationEl) {
+                destinationEl.innerHTML = str
+            }
+            let newFocusElement = document.querySelector(path)
+            if (newFocusElement) {
+                try {
+                    'setSelectionRange' in newFocusElement
+                        ? newFocusElement.setSelectionRange(
+                              selNumber,
+                              selNumber
+                          )
+                        : ''
+                    newFocusElement.focus()
+                } catch (e) {}
+            }
+            if (onUpdated) {
+                onUpdated.bind(this)()
+            }
+            cmps.forEach((cmp) => {
+                if (components[cmp]) {
+                    components[cmp].render()
+                }
+            })
+        }
+        Object.keys(cmpStore).forEach((key) => {
+            this.state[key] = cmpStore[key]
+        })
+        this.render()
+        onMounted.bind(this)()
+
+        return this
     }
-
-    this.render()
-    onMounted.bind(this)()
-
-    return this
 }
