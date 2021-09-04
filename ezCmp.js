@@ -99,10 +99,12 @@ function template(str, state,id,isChild = false){
             let classStr = match[1]
             let classArr = classStr.split(' ')
             classArr = classArr.map(item=>{
-                if(!item.startsWith('g-')){
-                    return `c-${id}-${item}`
+                if(item.startsWith('!')){
+                    return item.slice(1)
+                }else if(item.startsWith('c-')){
+                    return item
                 }else{
-                    return item.slice(2)
+                    return `c-${id}-${item}`
                 }
             })
             str = str.replace(match[0],`class="${classArr.join(' ')}"`)
@@ -146,8 +148,8 @@ function ezCmp(config){
             }
             if(commit != false){
                 target[key] = value;
+                that.render()
             }
-            that.render()
             return true
         }
     })
@@ -180,10 +182,12 @@ function ezCmp(config){
         }
         let newFocusElement = document.querySelector(path)
         if(newFocusElement){
-            'setSelectionRange' in newFocusElement
-                ? newFocusElement.setSelectionRange(selNumber,selNumber)
-                :''
-            newFocusElement.focus()
+            try{
+                'setSelectionRange' in newFocusElement
+                    ? newFocusElement.setSelectionRange(selNumber,selNumber)
+                    :''
+                newFocusElement.focus()
+            }catch(e){}
         }
         if(onUpdated){
             onUpdated.bind(this)()
