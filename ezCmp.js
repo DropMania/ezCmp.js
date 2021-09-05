@@ -120,12 +120,14 @@ function template(str, state, id, isChild = false) {
             let classStr = match[1]
             let classArr = classStr.split(' ')
             classArr = classArr.map((item) => {
-                if (item.startsWith('!')) {
-                    return item.slice(1)
-                } else if (item.startsWith('c-')) {
-                    return item
-                } else {
-                    return `c-${id}-${item}`
+                if (item) {
+                    if (item.startsWith('!')) {
+                        return item.slice(1)
+                    } else if (item.startsWith('c-')) {
+                        return item
+                    } else {
+                        return `c-${id}-${item}`
+                    }
                 }
             })
             str = str.replace(match[0], `class="${classArr.join(' ')}"`)
@@ -135,9 +137,7 @@ function template(str, state, id, isChild = false) {
     return str
 }
 let components = {}
-if (!localStorage.getItem('ezcmp-store')) {
-    localStorage.setItem('ezcmp-store', JSON.stringify({}))
-}
+
 class ezCmp {
     constructor(config) {
         let {
@@ -173,8 +173,8 @@ class ezCmp {
         storage = storage || []
         let destinationEl = document.querySelector(mount)
         let cmpStore = {}
-        if (JSON.parse(localStorage.getItem('ezcmp-store'))[name]) {
-            cmpStore = JSON.parse(localStorage.getItem('ezcmp-store'))[name]
+        if (localStorage.getItem(`ezcmp-${name}`)) {
+            cmpStore = JSON.parse(localStorage.getItem(`ezcmp-${name}`))
         }
         var style = document.createElement('style')
         var classString = Object.keys(classes)
@@ -203,13 +203,8 @@ class ezCmp {
                     if (storage.includes(key)) {
                         cmpStore[key] = value
                         localStorage.setItem(
-                            'ezcmp-store',
-                            JSON.stringify({
-                                ...JSON.parse(
-                                    localStorage.getItem('ezcmp-store')
-                                ),
-                                [name]: cmpStore
-                            })
+                            `ezcmp-${name}`,
+                            JSON.stringify(cmpStore)
                         )
                     }
                     target[key] = value
@@ -227,13 +222,7 @@ class ezCmp {
                 vars[fun] = computed[fun].bind(this)()
             })
             vars.props = {}
-            destinationEl = document.querySelector(mount)
-            destinationEl.getAttributeNames().forEach((name) => {
-                vars.props = {
-                    ...vars.props,
-                    [name]: destinationEl.getAttribute(name)
-                }
-            })
+
             let str = ''
             if (typeof renderFn === 'function') {
                 str = template(renderFn.bind(this)(), vars, name)
@@ -245,9 +234,18 @@ class ezCmp {
             'selectionStart' in document.activeElement
                 ? (selNumber = document.activeElement.selectionStart)
                 : ''
-            if (destinationEl) {
-                destinationEl.innerHTML = str
-            }
+
+            document.querySelectorAll(mount).forEach((destinationEl) => {
+                destinationEl.getAttributeNames().forEach((name) => {
+                    vars.props = {
+                        ...vars.props,
+                        [name]: destinationEl.getAttribute(name)
+                    }
+                })
+                if (destinationEl) {
+                    destinationEl.innerHTML = str
+                }
+            })
             let newFocusElement = document.querySelector(path)
             if (newFocusElement) {
                 try {
