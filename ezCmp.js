@@ -29,67 +29,128 @@ var cssPath = function (el) {
     }
     return path.join(' > ')
 }
-
-function template(str, state, id, isChild = false) {
-    let loopparts = str.split('</loop>')
-    loopparts.forEach((part, i) => {
-        let loopTag = part.match(/(<loop.*?>)(.*)/s)
-        if (loopTag) {
-            let loopStartTag = loopTag[1].match(/<loop\s*(.*)\s*>/)
-            let [loopVar, loopIdx, idx] = loopStartTag[1].split('_')
-            let loopStr = loopTag[2]
-            let loopArr = state[loopVar]
-            let outStr = ''
-            loopArr.forEach((item, index) => {
-                outStr += template(
-                    loopStr,
-                    { [loopIdx]: item, [idx]: index, ...state },
-                    id,
-                    true
-                )
-            })
-            str = str.replace(loopTag[0], outStr)
+function createLoopTag(doc,state,id){
+    let loops = doc.querySelectorAll('loop');
+    let filtered = [...loops].filter(tag => {
+        while (tag.parentNode) {
+            if (tag.parentNode.tagName === 'LOOP') {
+                return false
+            }
+            tag = tag.parentNode
         }
+        return true
     })
-
-    /*  let ifArray = Array.from(str.matchAll(/(<if.*?>)(.*)(<\/if>)/gs))
-    ifArray.forEach((match, index) => {
-        let operation = match[1].match(/<if\s*(.*)\s*>/)[1]
-        let [left, operator, right] = operation.split('_')
-        let leftVal = state[left] || ''
-        console.log(ifArray)
-        operator = operator || ''
-        let rightVal = state[right] || ''
-        let result = eval(`${leftVal} ${operator} ${rightVal}`)
-        console.log(operation)
-        str = str.replace(match[0], result ? match[2] : '')
-    })
- */
-
-    let ifparts = str.split('</if>')
-    ifparts.forEach((part, i) => {
-        let ifTag = part.match(/(<if.*?>)(.*)/s)
-        if (ifTag) {
-            let ifStartTag = ifTag[1].match(/<if\s*(.*)\s*>/)
-            part = ifTag[2]
-            let conditonvar = ifStartTag[1]
-            if (conditonvar.startsWith('!')) {
-                conditonvar = conditonvar.slice(1)
-                if (!state[conditonvar]) {
-                } else {
-                    part = part.replace(ifTag[2], '')
-                }
+    filtered.forEach((tag) => {
+        let stateVar = tag.getAttribute('for')
+        let as = tag.getAttribute('as')
+        let i = tag.getAttribute('i')
+        let obj = stateVar.split('.')
+        let loopArr = []
+        obj.forEach(function (item, index) {
+            if (index == 0) {
+                loopArr = state[item]
             } else {
-                if (state[conditonvar]) {
-                } else {
-                    part = part.replace(ifTag[2], '')
+                loopArr = loopArr[item]
+            }
+        })
+        let loopStr = tag.innerHTML
+        let outStr = ''
+        loopArr.forEach((itemA, indexA) => {
+            outStr += DOMtemplate(loopStr,{
+                ... state, 
+                [i]: indexA,
+                [as]: itemA
+            },id, true)
+        })
+        tag.innerHTML = outStr
+    })
+}
+
+function createIfTag(doc,state){
+    let ifs = doc.querySelectorAll('if');
+    let filtered = [...ifs].filter(tag => {
+        while (tag.parentNode) {
+            if (tag.parentNode.tagName === 'IF') {
+                return false
+            }
+            tag = tag.parentNode
+        }
+        return true
+    })
+    filtered.forEach((tag) => {
+        let condition = tag.getAttribute('c')
+        let values = condition.split(/\s+/)
+        let finalEval = ''
+        values.forEach((item, index) => {
+            var negate = ''
+            if(item.startsWith('!')){
+                item = item.slice(1)
+                negate = '!'
+            }
+            var val = item
+            if (item.split('.')[0] in state) {
+                let obj = item.split('.')
+                obj.forEach(function (item, index) {
+                    if (index == 0) {
+                        val = state[item]
+                    } else {
+                        val = val[item]
+                    }
+                })
+                if(typeof val === 'string'){
+                    val = `'${val}'`
                 }
             }
-            str = str.replace(ifTag[0], part)
+            finalEval +=  negate + val + ' '
+        })
+        try{
+            if (!(eval(finalEval))) {
+                tag.parentNode.removeChild(tag)
+            }
+        }catch(e){
         }
     })
+}
+
+function createJsonTag(doc,state,id){
+    let jsonTags = doc.querySelectorAll('json');
+    let filtered = [...jsonTags].filter(tag => {
+        while (tag.parentNode) {
+            if (tag.parentNode.tagName === 'JSON') {
+                return false
+            }
+            tag = tag.parentNode
+        }
+        return true
+    })
+    filtered.forEach(async (tag) => {
+        let url = tag.getAttribute('url')
+        let as = tag.getAttribute('as')
+        let convert = tag.getAttribute('convert')
+        let str = tag.innerHTML
+        let path = cssPath(tag)
+        tag.innerHTML = '<div class="loading">Loading...</div>'
+        let res = await fetch(url)
+        let json = await res.json()
+        if(convert){
+            json = components[id][convert](json)
+        }
+        document.querySelector(path).innerHTML = DOMtemplate(str,{
+            ... state,
+            [as]: json
+        },id, true)
+    })
+}
+
+function DOMtemplate(str, state, id, isChild = false) {
+    let parser = new DOMParser()
+    let doc = parser.parseFromString(str, 'text/html')
+    createJsonTag(doc,state,id)
+    createLoopTag(doc,state,id)
+    createIfTag(doc,state)
+    let text = doc.body.innerHTML
     let regex = /\{(.*?)\}/g
-    let matches = str.match(regex)
+    let matches = text.match(regex)
     if (matches) {
         for (let i = 0; i < matches.length; i++) {
             let key = matches[i].replace(/\{|\}/g, '')
@@ -101,40 +162,39 @@ function template(str, state, id, isChild = false) {
                     obj[index] = obj[index - 1][item]
                 }
             })
-            str = str.replace(matches[i], obj[obj.length - 1])
+            text = text.replace(matches[i], obj[obj.length - 1])
         }
     }
-    if (!isChild) {
+    if(!isChild){
+        let classRegex = Array.from(text.matchAll(/class="(.*?)"/g))
+        classRegex.forEach((match, i) => {
+            if (match) {
+                let classStr = match[1]
+                let classArr = classStr.split(/\s+/)
+                classArr = classArr.map((item) => {
+                    console.log(item)
+                    if (item) {
+                        if (item.startsWith('!')) {
+                            return item.slice(1)
+                        } else if (item.startsWith('c-')) {
+                            return item
+                        } else {
+                            return `c-${id}-${item}`
+                        }
+                    }
+                })
+                text = text.replace(match[0], `class="${classArr.join(' ')}"`)
+            }
+        })
         let events = ['onclick', 'onchange', 'onsubmit', 'oninput', 'onkeyup']
         events.forEach(function (e) {
-            str = str.replace(
+            text = text.replace(
                 new RegExp(`${e}="`, 'g'),
                 `${e}="components['${id}'].`
             )
         })
     }
-
-    let classRegex = Array.from(str.matchAll(/class="(.*?)"/g))
-    classRegex.forEach((match, i) => {
-        if (match) {
-            let classStr = match[1]
-            let classArr = classStr.split(' ')
-            classArr = classArr.map((item) => {
-                if (item) {
-                    if (item.startsWith('!')) {
-                        return item.slice(1)
-                    } else if (item.startsWith('c-')) {
-                        return item
-                    } else {
-                        return `c-${id}-${item}`
-                    }
-                }
-            })
-            str = str.replace(match[0], `class="${classArr.join(' ')}"`)
-        }
-    })
-
-    return str
+    return text
 }
 let components = {}
 
@@ -214,7 +274,7 @@ class ezCmp {
             }
         })
         Object.keys(methods).forEach((fun) => {
-            this[fun] = methods[fun].bind(this)
+            this[fun] = methods[fun].bind(this.state,methods)
         })
         this.render = function () {
             let vars = { ...this.state }
@@ -225,9 +285,9 @@ class ezCmp {
 
             let str = ''
             if (typeof renderFn === 'function') {
-                str = template(renderFn.bind(this)(), vars, name)
+                str = DOMtemplate(renderFn.bind(this)(), vars, name)
             } else {
-                str = template(renderFn, vars, name)
+                str = DOMtemplate(renderFn, vars, name)
             }
             let path = cssPath(document.activeElement)
             let selNumber = 0
