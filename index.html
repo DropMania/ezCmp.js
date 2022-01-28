@@ -63,15 +63,23 @@
                     this.state.todos = this.state.todos
                 }
             },
+            classes:{
+                grid: {
+                    display: 'flex',
+                    alignItems: 'center',
+                }
+            },
             render: /*html*/`      
             <h1 class="blue">Todo EZCMP</h1>
-            <input value="{curTodo}" oninput="setCurTodo(event)" onkeyup="pressTodo(event)" />
-            <button onclick="addTodo()" class="!green !whiteText">Add Todo</button><br>
-            {todoCount} todos
+            <input bind="curTodo"  onkeyup="pressTodo(event)" />
+            <button onclick="addTodo()">Add Todo</button><br>
+            <div>
+                {todoCount} todos
+            </div>
             <ul>
                 <loop for="todos" as="todo"i="i">
-                    <li class="{todo.state} !grid">
-                        {todo.text}
+                    <li class="grid">
+                        <div>{todo.text}</div>
                         <input type="checkbox" {todo.state} onchange="setChecked(event,{i})">
                         <button onclick="removeTodo({i})">X</button>
                     </li>

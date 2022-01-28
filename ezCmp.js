@@ -29,7 +29,7 @@ var cssPath = function (el) {
     }
     return path.join(' > ')
 }
-function createLoopTag(doc,state,id){
+function createLoopTag(doc,state,id,classes){
     let loops = doc.querySelectorAll('loop');
     let filtered = [...loops].filter(tag => {
         while (tag.parentNode) {
@@ -60,7 +60,8 @@ function createLoopTag(doc,state,id){
                 ... state, 
                 [i]: indexA,
                 [as]: itemA
-            },id, true)
+                
+            },id, true,classes)
         })
         tag.innerHTML = outStr
     })
@@ -112,7 +113,7 @@ function createIfTag(doc,state){
     })
 }
 
-function createJsonTag(doc,state,id){
+function createJsonTag(doc,state,id,classes){
     let jsonTags = doc.querySelectorAll('json');
     let filtered = [...jsonTags].filter(tag => {
         while (tag.parentNode) {
@@ -138,15 +139,15 @@ function createJsonTag(doc,state,id){
         document.querySelector(path).innerHTML = DOMtemplate(str,{
             ... state,
             [as]: json
-        },id, true)
+        },id, false,classes)
     })
 }
 
-function DOMtemplate(str, state, id, isChild = false) {
+function DOMtemplate(str, state, id, isChild = false,classes) {
     let parser = new DOMParser()
     let doc = parser.parseFromString(str, 'text/html')
-    createJsonTag(doc,state,id)
-    createLoopTag(doc,state,id)
+    createJsonTag(doc,state,id,classes)
+    createLoopTag(doc,state,id,classes)
     createIfTag(doc,state)
     let text = doc.body.innerHTML
     let regex = /\{(.*?)\}/g
@@ -173,35 +174,38 @@ function DOMtemplate(str, state, id, isChild = false) {
                 let classArr = classStr.split(/\s+/)
                 classArr = classArr.map((item) => {
                     if (item) {
-                        if (item.startsWith('!')) {
-                            return item.slice(1)
-                        } else if (item.startsWith('c-')) {
-                            return item
-                        } else {
+                        if (classes[item]) {
                             return `c-${id}-${item}`
+                        } else {
+                            return item
                         }
                     }
                 })
                 text = text.replace(match[0], `class="${classArr.join(' ')}"`)
             }
         })
-        let events = ['onclick', 'onchange', 'onsubmit', 'oninput', 'onkeyup']
-        events.forEach(function (e) {
-            text = text.replace(
-                new RegExp(`${e}="`, 'g'),
-                `${e}="components['${id}'].`
-            )
-        })
+        text = text.replace(/on\w+="/g,
+            (match) => `${match}components['${id}'].`
+        )
     }
     return text
 }
 function compareEls(el,compareEl){
-    if(!el) return false
+    let allEls = [...el.querySelectorAll('*')].reverse()
+
+    allEls.forEach((item,index) => {
+        let path = cssPath(item)
+        let compareItem = compareEl.querySelector(path)
+        if(compareItem){
+            if(item.tagName === compareItem.tagName){
+                if(item.textContent !== compareItem.textContent){
+                    item.innerHTML = compareItem.innerHTML
+                }
+            }
+        }
+    })
     if(el.textContent !== compareEl.textContent){
         el.innerHTML = compareEl.innerHTML
-        console.log('changed',el.textContent,compareEl.textContent)
-    }else{
-        compareEls(el.firstElementChild,compareEl.firstElementChild)
     }
 }
 function compareHTML(el, str){
@@ -290,7 +294,7 @@ class ezCmp {
         Object.keys(methods).forEach((fun) => {
             this[fun] = methods[fun].bind(this)
         })
-        this.render = function (init = false) {
+        this.render = function () {
             let vars = { ...this.state }
             Object.keys(computed).forEach((fun) => {
                 vars[fun] = computed[fun].bind(this)()
@@ -299,9 +303,9 @@ class ezCmp {
 
             let str = ''
             if (typeof renderFn === 'function') {
-                str = DOMtemplate(renderFn.bind(this)(), vars, name)
+                str = DOMtemplate(renderFn.bind(this)(), vars, name, false,classes)
             } else {
-                str = DOMtemplate(renderFn, vars, name)
+                str = DOMtemplate(renderFn, vars, name,false, classes)
             }
             let path = cssPath(document.activeElement)
             let selNumber = 0
@@ -317,12 +321,22 @@ class ezCmp {
                     }
                 })
                 if (destinationEl) {
-                    if(!init){
                         compareHTML(destinationEl, str, vars)
-                    } else {
-                        destinationEl.innerHTML = str
-                    }
+                    
 
+                }
+            })
+            let bindFields = document.querySelectorAll(`[bind]`)
+            bindFields.forEach((item) => {
+                let bind = item.getAttribute('bind')
+                if (bind) {
+                    item.value = this.state[bind]
+                    if(item.getAttribute('binded') !== 'true'){
+                        item.setAttribute('binded',"true")
+                        item.addEventListener('input', function (e) {
+                            that.state[bind] = e.target.value
+                        })
+                    }
                 }
             })
             let newFocusElement = document.querySelector(path)
@@ -351,7 +365,7 @@ class ezCmp {
                 this.state[key] = cmpStore[key]
             }
         })
-        this.render(true)
+        this.render()
         onMounted.bind(this)()
 
         return this
