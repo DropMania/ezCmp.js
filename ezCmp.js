@@ -172,7 +172,6 @@ function DOMtemplate(str, state, id, isChild = false) {
                 let classStr = match[1]
                 let classArr = classStr.split(/\s+/)
                 classArr = classArr.map((item) => {
-                    console.log(item)
                     if (item) {
                         if (item.startsWith('!')) {
                             return item.slice(1)
@@ -195,6 +194,21 @@ function DOMtemplate(str, state, id, isChild = false) {
         })
     }
     return text
+}
+function compareEls(el,compareEl){
+    if(!el) return false
+    if(el.textContent !== compareEl.textContent){
+        el.innerHTML = compareEl.innerHTML
+        console.log('changed',el.textContent,compareEl.textContent)
+    }else{
+        compareEls(el.firstElementChild,compareEl.firstElementChild)
+    }
+}
+function compareHTML(el, str){
+    let parser = new DOMParser()
+    let doc = parser.parseFromString(str, 'text/html')
+    let compareEl = doc.body
+    compareEls(el,compareEl)
 }
 let components = {}
 
@@ -274,9 +288,9 @@ class ezCmp {
             }
         })
         Object.keys(methods).forEach((fun) => {
-            this[fun] = methods[fun].bind(this.state,methods)
+            this[fun] = methods[fun].bind(this)
         })
-        this.render = function () {
+        this.render = function (init = false) {
             let vars = { ...this.state }
             Object.keys(computed).forEach((fun) => {
                 vars[fun] = computed[fun].bind(this)()
@@ -303,7 +317,12 @@ class ezCmp {
                     }
                 })
                 if (destinationEl) {
-                    destinationEl.innerHTML = str
+                    if(!init){
+                        compareHTML(destinationEl, str, vars)
+                    } else {
+                        destinationEl.innerHTML = str
+                    }
+
                 }
             })
             let newFocusElement = document.querySelector(path)
@@ -332,7 +351,7 @@ class ezCmp {
                 this.state[key] = cmpStore[key]
             }
         })
-        this.render()
+        this.render(true)
         onMounted.bind(this)()
 
         return this
