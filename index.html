@@ -1,94 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>EZ CMP IS GREAT!</title>
-        <script src="ezCmp.js"></script>
-        <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css">
-
-    </head>
-    <body>
-    </body>
-    <script>
-        new ezCmp({
-            mount: 'body',
-            name: 'main',
-            state: {
-                curTodo: '',
-                todos: [
-                    { text: 'eat', state: 'checked' },
-                    { text: 'work', state: '' },
-                    { text: 'sleep', state: '' }
-                ]
-            },
-            storage: ['todos'],
-            computed: {
-                todoCount() {
-                    return this.state.todos.length
-                },
-                is5() {
-                    return this.state.todos.length == 5
-                }
-            },
-            watch: {
-                todos: (newval) => newval.length <= 5
-            },
-            methods: {
-                setCurTodo(e) {
-                    this.state.curTodo = e.target.value
-                },
-                addTodo() {
-                    if (this.state.curTodo != '') {
-                        this.state.todos = [
-                            ...this.state.todos,
-                            { text: this.state.curTodo, checked: '' }
-                        ]
-                        this.state.curTodo = ''
-                    }
-                },
-                pressTodo(e) {
-                    if (e.keyCode == 13) {
-                        this.addTodo()
-                    }
-                },
-                setChecked(e, i) {
-                    let val = e.target.checked
-                    this.state.todos[i].state = val ? 'checked' : ''
-                    this.state.todos = this.state.todos
-                },
-                removeTodo(i) {
-                    this.state.todos.splice(i, 1)
-                    this.state.todos = this.state.todos
-                }
-            },
-            classes:{
-                grid: {
-                    display: 'flex',
-                    alignItems: 'center',
-                }
-            },
-            render: /*html*/`      
-            <h1 class="blue">Todo EZCMP</h1>
-            <input bind="curTodo"  onkeyup="pressTodo(event)" />
-            <button onclick="addTodo()">Add Todo</button><br>
-            <div>
-                {todoCount} todos
-            </div>
-            <ul>
-                <loop for="todos" as="todo"i="i">
-                    <li class="grid">
-                        <div>{todo.text}</div>
-                        <input type="checkbox" {todo.state} onchange="setChecked(event,{i})">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="ezCmp.js"></script>
+</head>
+<body>
+    <div class="todos">Hallo</div>
+    <my-component>
+        <h1>Todo App:</h1>
+        <input bind="inputText" onkeyup="pressTodo(event)">
+        <button onclick="addTodo()">Add Todo</button>
+        <ul class="todos">
+            Todos: {todosCount.done}/{todosCount.total}
+            <loop for="todos" as="todo" i="i">
+                <li>
+                    <input type="checkbox" {todo.done} onchange="checkTodo({i})">
+                    {todo.text}
+                    <if c="todo.done">
                         <button onclick="removeTodo({i})">X</button>
-                    </li>
-                </loop>
-            </ul>
-            <if c="is5">
-                Todos full!
-            </if>
-        `
-        })
-    </script>
+                    </if>
+                </li>
+            </loop>
+        </ul>
+    </my-component>
+</body>
+<script>
+    ezCmp.define('my-component',{
+        classes:{
+            todos:{
+                fontSize: '3rem'
+            }
+        },
+        state:{
+            inputText: '',
+            todos: [
+                {text: 'learn Svelte', done: ''},
+                {text: 'learn React', done: ''},
+                {text: 'learn ezCmp', done: 'checked'},
+            ]
+        },
+        computed:{
+            todosCount(){
+                return {
+                    total: this.state.todos.length,
+                    done: this.state.todos.filter(t=>t.done).length
+                }
+            }
+        },
+        storage: ['todos','inputText'],
+        methods:{
+            pressTodo(e){
+                if(e.keyCode == 13) this.addTodo()
+            },
+            addTodo(){
+                this.state.todos = [...this.state.todos,{
+                    text: this.state.inputText,
+                    done: ''
+                }]
+                this.state.inputText = ''
+            },
+            checkTodo(i){
+                this.state.todos[i].done = this.state.todos[i].done ? '' : 'checked' 
+                this.state.todos = this.state.todos
+            },
+            removeTodo(i){
+                this.state.todos = this.state.todos.filter((t,ind)=>ind!=i)
+            }
+        }
+    })
+</script>
 </html>

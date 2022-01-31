@@ -134,7 +134,7 @@ function createJsonTag(doc,state,id,classes){
         let res = await fetch(url)
         let json = await res.json()
         if(convert){
-            json = components[id][convert](json)
+            json = ezCmp.components[id][convert](json)
         }
         document.querySelector(path).innerHTML = DOMtemplate(str,{
             ... state,
@@ -142,13 +142,19 @@ function createJsonTag(doc,state,id,classes){
         },id, false,classes)
     })
 }
-
+function createSlotTag(doc,state,id,classes){
+    let slotTags = doc.querySelectorAll('slot');
+    slotTags.forEach((tag) => {
+        tag.innerHTML = DOMtemplate(state.slot,state,id,true,classes)
+    })
+}
 function DOMtemplate(str, state, id, isChild = false,classes) {
     let parser = new DOMParser()
     let doc = parser.parseFromString(str, 'text/html')
     createJsonTag(doc,state,id,classes)
     createLoopTag(doc,state,id,classes)
     createIfTag(doc,state)
+    createSlotTag(doc,state,id,classes)
     let text = doc.body.innerHTML
     let regex = /\{(.*?)\}/g
     let matches = text.match(regex)
@@ -185,7 +191,7 @@ function DOMtemplate(str, state, id, isChild = false,classes) {
             }
         })
         text = text.replace(/on\w+="/g,
-            (match) => `${match}components['${id}'].`
+            (match) => `${match}ezCmp.components['${id}'].`
         )
     }
     return text
@@ -214,26 +220,44 @@ function compareHTML(el, str){
     let compareEl = doc.body
     compareEls(el,compareEl)
 }
-let components = {}
 
 class ezCmp {
+    static define(id, config){
+        ezCmp.definedComponents[id] = config
+    }
+    static init(root = document.querySelector('[ezcmp]') || document.body){
+        let ez_root = root
+        Object.entries(ezCmp.definedComponents).forEach(([id, config]) => {
+            ez_root.querySelectorAll(id).forEach((el, i) => {
+                if(!ezCmp.components[`${id}-${i}`]){
+                    new ezCmp({name: id,key: i, el,slot: el.innerHTML, ...config})
+                }else{
+                    //components[`${id}-${i}`].render()
+                }
+            })
+        })
+    }
+    static components = {}
+    static definedComponents = {}
     constructor(config) {
         let {
-            mount,
             state: data,
             render,
             methods,
             onMounted,
             onUpdated,
             name,
+            key,
+            el,
             watch,
             computed,
             components: cmps,
             classes,
-            storage
+            storage,
+            slot
         } = config
-        name = name || randomString(10)
-        components[name] = this
+        name = (name || randomString(10)) + '-' + key
+        ezCmp.components[name] = this
         let that = this
         data = data || {}
         watch = watch || {}
@@ -243,13 +267,13 @@ class ezCmp {
         let renderFn =
             render ||
             function () {
-                return ''
+                return '<slot></slot>'
             }
         methods = methods || {}
         onUpdated = onUpdated || function () {}
         classes = classes || {}
         storage = storage || []
-        let destinationEl = document.querySelector(mount)
+        let destinationEl = el
         let cmpStore = {}
         if (localStorage.getItem(`ezcmp-${name}`)) {
             cmpStore = JSON.parse(localStorage.getItem(`ezcmp-${name}`))
@@ -271,7 +295,7 @@ class ezCmp {
         style.appendChild(document.createTextNode(classString))
 
         document.getElementsByTagName('head')[0].appendChild(style)
-        this.state = new Proxy(data, {
+        this.state = new Proxy({ slot,...data}, {
             set: function (target, key, value, receiver) {
                 let commit = true
                 if (key in watch) {
@@ -312,21 +336,11 @@ class ezCmp {
             'selectionStart' in document.activeElement
                 ? (selNumber = document.activeElement.selectionStart)
                 : ''
-
-            document.querySelectorAll(mount).forEach((destinationEl) => {
-                destinationEl.getAttributeNames().forEach((name) => {
-                    vars.props = {
-                        ...vars.props,
-                        [name]: destinationEl.getAttribute(name)
-                    }
-                })
+            
                 if (destinationEl) {
-                        compareHTML(destinationEl, str, vars)
-                    
-
+                    compareHTML(destinationEl, str, vars)
                 }
-            })
-            let bindFields = document.querySelectorAll(`[bind]`)
+            let bindFields = el.querySelectorAll(`[bind]`)
             bindFields.forEach((item) => {
                 let bind = item.getAttribute('bind')
                 if (bind) {
@@ -354,20 +368,21 @@ class ezCmp {
             if (onUpdated) {
                 onUpdated.bind(this)()
             }
-            cmps.forEach((cmp) => {
-                if (components[cmp]) {
-                    components[cmp].render()
-                }
-            })
+            //ezCmp.init(el)
         }
         Object.keys(cmpStore).forEach((key) => {
             if (storage.includes(key)) {
                 this.state[key] = cmpStore[key]
             }
         })
+       
         this.render()
+        this.state.init = true
         onMounted.bind(this)()
 
         return this
     }
 }
+document.addEventListener('DOMContentLoaded', function () {
+    ezCmp.init()
+})
