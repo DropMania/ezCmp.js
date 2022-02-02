@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src='ezCmp.js'></script>
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css">
+</head>
+<body>
+    <image-search class="container">
+        <h1>Image Search</h1>
+        <input placeholder="Search Images" bind='searchString'>
+        <button onclick="search()">Suchen</button>
+        <if c='loading'>
+            <a href="#" aria-busy="true">Searching…</a>
+        </if>
+        <if c='!loading'>
+            found {imageCount} images
+            <loop for="images" as="image">
+                <image-display src="{image.image}">
+                </image-display>
+            </loop>
+        </if>
+    </image-search>
+</body>
+<script>
+    ezCmp.define('image-display',{
+        render: `<img src='{src}' />`
+    })
+    ezCmp.define('image-search',{
+        state:{
+            searchString: '',
+            loading: false,
+            images: []
+        },
+        computed:{
+            imageCount(){
+                return this.S.images.length
+            }
+        },
+        methods:{
+            async search(){
+                this.S.loading = true
+                let res = await fetch(`https://nature-image-api.vercel.app/search?q=${this.S.searchString}`)
+                let data = await res.json()
+                this.S.images = data.images
+                this.S.loading = false
+            }
+        }
+    })
+</script>
+</html>

@@ -1,5 +1,5 @@
 function randomString(len) {
-    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
     var str = ''
     for (var i = 0; i < len; i++) {
         str += chars.charAt(Math.floor(Math.random() * chars.length))
@@ -7,10 +7,10 @@ function randomString(len) {
     return str
 }
 
-var cssPath = function (el) {
+var cssPath = function (el, top) {
     if (!(el instanceof Element)) return
     var path = []
-    while (el.nodeType === Node.ELEMENT_NODE) {
+    while (el.nodeType === Node.ELEMENT_NODE && el !== top) {
         var selector = el.nodeName.toLowerCase()
         if (el.id) {
             selector += '#' + el.id
@@ -29,7 +29,7 @@ var cssPath = function (el) {
     }
     return path.join(' > ')
 }
-function createLoopTag(doc,state,id,classes){
+function createLoopTag(doc,state,id,classes,slot){
     let loops = doc.querySelectorAll('loop');
     let filtered = [...loops].filter(tag => {
         while (tag.parentNode) {
@@ -61,7 +61,7 @@ function createLoopTag(doc,state,id,classes){
                 [i]: indexA,
                 [as]: itemA
                 
-            },id, true,classes)
+            },id, true,classes,slot)
         })
         tag.innerHTML = outStr
     })
@@ -113,7 +113,7 @@ function createIfTag(doc,state){
     })
 }
 
-function createJsonTag(doc,state,id,classes){
+function createJsonTag(doc,state,id,classes,slot){
     let jsonTags = doc.querySelectorAll('json');
     let filtered = [...jsonTags].filter(tag => {
         while (tag.parentNode) {
@@ -128,33 +128,37 @@ function createJsonTag(doc,state,id,classes){
         let url = tag.getAttribute('url')
         let as = tag.getAttribute('as')
         let convert = tag.getAttribute('convert')
+        let hash = randomString(10)
+        tag.setAttribute('hash',hash)
         let str = tag.innerHTML
-        let path = cssPath(tag)
         tag.innerHTML = '<div class="loading">Loading...</div>'
         let res = await fetch(url)
         let json = await res.json()
         if(convert){
-            json = ezCmp.components[id][convert](json)
+            json = ezCmp.components[id].M[convert](json)
         }
-        document.querySelector(path).innerHTML = DOMtemplate(str,{
-            ... state,
-            [as]: json
-        },id, false,classes)
+        let jsonEl = document.body.querySelector(`[hash=${hash}]`)
+        if(jsonEl){
+            jsonEl.innerHTML = DOMtemplate(str,{
+                ... state,
+                [as]: json
+            },id, false,classes,slot)
+        }
     })
 }
-function createSlotTag(doc,state,id,classes){
+function createSlotTag(doc,state,id,classes,slot){
     let slotTags = doc.querySelectorAll('slot');
     slotTags.forEach((tag) => {
-        tag.innerHTML = DOMtemplate(state.slot,state,id,true,classes)
+        tag.innerHTML = DOMtemplate(slot,state,id,true,classes,slot)
     })
 }
-function DOMtemplate(str, state, id, isChild = false,classes) {
+function DOMtemplate(str, state, id, isChild = false,classes,slot = '') {
     let parser = new DOMParser()
     let doc = parser.parseFromString(str, 'text/html')
-    createJsonTag(doc,state,id,classes)
-    createLoopTag(doc,state,id,classes)
+    createJsonTag(doc,state,id,classes,slot)
+    createLoopTag(doc,state,id,classes,slot)
     createIfTag(doc,state)
-    createSlotTag(doc,state,id,classes)
+    createSlotTag(doc,state,id,classes,slot)
     let text = doc.body.innerHTML
     let regex = /\{(.*?)\}/g
     let matches = text.match(regex)
@@ -197,10 +201,10 @@ function DOMtemplate(str, state, id, isChild = false,classes) {
     return text
 }
 function compareEls(el,compareEl){
+    compareEl = compareEl
     let allEls = [...el.querySelectorAll('*')].reverse()
-
     allEls.forEach((item,index) => {
-        let path = cssPath(item)
+        let path = cssPath(item,el)
         let compareItem = compareEl.querySelector(path)
         if(compareItem){
             if(item.tagName === compareItem.tagName){
@@ -230,9 +234,14 @@ class ezCmp {
         Object.entries(ezCmp.definedComponents).forEach(([id, config]) => {
             ez_root.querySelectorAll(id).forEach((el, i) => {
                 if(!ezCmp.components[`${id}-${i}`]){
-                    new ezCmp({name: id,key: i, el,slot: el.innerHTML, ...config})
+                    let propNames = el.getAttributeNames()
+                    let props = {}
+                    propNames.forEach((item) => {
+                        props[item] = el.getAttribute(item)
+                    })
+                    new ezCmp({name: id,key: i, el,slot: el.innerHTML,props, ...config})
                 }else{
-                    //components[`${id}-${i}`].render()
+                    ezCmp.components[`${id}-${i}`].render()
                 }
             })
         })
@@ -254,7 +263,8 @@ class ezCmp {
             components: cmps,
             classes,
             storage,
-            slot
+            slot,
+            props
         } = config
         name = (name || randomString(10)) + '-' + key
         ezCmp.components[name] = this
@@ -264,6 +274,7 @@ class ezCmp {
         cmps = cmps || []
         computed = computed || {}
         onMounted = onMounted || function () {}
+        props = props || {}
         let renderFn =
             render ||
             function () {
@@ -295,7 +306,9 @@ class ezCmp {
         style.appendChild(document.createTextNode(classString))
 
         document.getElementsByTagName('head')[0].appendChild(style)
-        this.S = new Proxy({ slot,...data}, {
+        this.slot = slot
+        this.P = props
+        this.S = new Proxy(data, {
             set: function (target, key, value, receiver) {
                 let commit = true
                 if (key in watch) {
@@ -324,14 +337,14 @@ class ezCmp {
             Object.keys(computed).forEach((fun) => {
                 this.C[fun] = computed[fun].bind(this)()
             })
-            let vars = { ...this.S, ...this.C}
+            let vars = { ...this.P, ...this.C, ...this.S }
             vars.props = {}
 
             let str = ''
             if (typeof renderFn === 'function') {
-                str = DOMtemplate(renderFn.bind(this)(), vars, name, false,classes)
+                str = DOMtemplate(renderFn.bind(this)(), vars, name, false,classes,this.slot)
             } else {
-                str = DOMtemplate(renderFn, vars, name,false, classes)
+                str = DOMtemplate(renderFn, vars, name,false, classes,this.slot)
             }
             let path = cssPath(document.activeElement)
             let selNumber = 0
@@ -370,7 +383,7 @@ class ezCmp {
             if (onUpdated) {
                 onUpdated.bind(this)()
             }
-            //ezCmp.init(el)
+            ezCmp.init(el)
         }
         Object.keys(cmpStore).forEach((key) => {
             if (storage.includes(key)) {

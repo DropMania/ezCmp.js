@@ -9,9 +9,29 @@
 </head>
 <body>
     <div class="todos">Hallo</div>
-    <my-component />  
+    <my-component abc='hallo ok'>
+        <h1>Todo App {abc}:</h1>
+        <input bind="inputText" onkeyup="pressTodo(event)">
+        <button onclick="addTodo()">Add Todo</button>
+        <ul class="todos">
+            Todos: {todosCount.done}/{todosCount.total}
+            <loop for="todos" as="todo" i="i">
+                <header-cmp i="{i}"></header-cmp>
+                <li>
+                    <input type="checkbox" {todo.done} onchange="checkTodo({i})">
+                    {todo.text}
+                    <if c="todo.done">
+                        <button onclick="removeTodo({i})">X</button>
+                    </if>
+                </li>
+            </loop>
+        </ul>
+    </my-component>  
 </body>
 <script>
+    ezCmp.define('header-cmp',{
+        render: "<div>header {i}</div>",
+    })
     ezCmp.define('my-component',{
         classes:{
             todos:{
@@ -53,24 +73,7 @@
             removeTodo(i){
                 this.S.todos = this.S.todos.filter((t,ind)=>ind!=i)
             }
-        },
-        render: /*html*/`
-        <h1>Todo App:</h1>
-        <input bind="inputText" onkeyup="pressTodo(event)">
-        <button onclick="addTodo()">Add Todo</button>
-        <ul class="todos">
-            Todos: {todosCount.done}/{todosCount.total}
-            <loop for="todos" as="todo" i="i">
-                <li>
-                    <input type="checkbox" {todo.done} onchange="checkTodo({i})">
-                    {todo.text}
-                    <if c="todo.done">
-                        <button onclick="removeTodo({i})">X</button>
-                    </if>
-                </li>
-            </loop>
-        </ul>
-        `
+        }
     })
 </script>
 </html>
