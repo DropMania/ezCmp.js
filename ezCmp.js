@@ -191,7 +191,7 @@ function DOMtemplate(str, state, id, isChild = false,classes) {
             }
         })
         text = text.replace(/on\w+="/g,
-            (match) => `${match}ezCmp.components['${id}'].`
+            (match) => `${match}ezCmp.components['${id}'].M.`
         )
     }
     return text
@@ -295,7 +295,7 @@ class ezCmp {
         style.appendChild(document.createTextNode(classString))
 
         document.getElementsByTagName('head')[0].appendChild(style)
-        this.state = new Proxy({ slot,...data}, {
+        this.S = new Proxy({ slot,...data}, {
             set: function (target, key, value, receiver) {
                 let commit = true
                 if (key in watch) {
@@ -315,14 +315,16 @@ class ezCmp {
                 return true
             }
         })
+        this.M = {}
         Object.keys(methods).forEach((fun) => {
-            this[fun] = methods[fun].bind(this)
+            this.M[fun] = methods[fun].bind(this)
         })
+        this.C = {}
         this.render = function () {
-            let vars = { ...this.state }
             Object.keys(computed).forEach((fun) => {
-                vars[fun] = computed[fun].bind(this)()
+                this.C[fun] = computed[fun].bind(this)()
             })
+            let vars = { ...this.S, ...this.C}
             vars.props = {}
 
             let str = ''
@@ -344,11 +346,11 @@ class ezCmp {
             bindFields.forEach((item) => {
                 let bind = item.getAttribute('bind')
                 if (bind) {
-                    item.value = this.state[bind]
+                    item.value = this.S[bind]
                     if(item.getAttribute('binded') !== 'true'){
                         item.setAttribute('binded',"true")
                         item.addEventListener('input', function (e) {
-                            that.state[bind] = e.target.value
+                            that.S[bind] = e.target.value
                         })
                     }
                 }
@@ -372,12 +374,12 @@ class ezCmp {
         }
         Object.keys(cmpStore).forEach((key) => {
             if (storage.includes(key)) {
-                this.state[key] = cmpStore[key]
+                this.S[key] = cmpStore[key]
             }
         })
        
         this.render()
-        this.state.init = true
+        this.S.init = true
         onMounted.bind(this)()
 
         return this

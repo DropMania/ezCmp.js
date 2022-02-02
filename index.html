@@ -9,23 +9,7 @@
 </head>
 <body>
     <div class="todos">Hallo</div>
-    <my-component>
-        <h1>Todo App:</h1>
-        <input bind="inputText" onkeyup="pressTodo(event)">
-        <button onclick="addTodo()">Add Todo</button>
-        <ul class="todos">
-            Todos: {todosCount.done}/{todosCount.total}
-            <loop for="todos" as="todo" i="i">
-                <li>
-                    <input type="checkbox" {todo.done} onchange="checkTodo({i})">
-                    {todo.text}
-                    <if c="todo.done">
-                        <button onclick="removeTodo({i})">X</button>
-                    </if>
-                </li>
-            </loop>
-        </ul>
-    </my-component>
+    <my-component />  
 </body>
 <script>
     ezCmp.define('my-component',{
@@ -45,31 +29,48 @@
         computed:{
             todosCount(){
                 return {
-                    total: this.state.todos.length,
-                    done: this.state.todos.filter(t=>t.done).length
+                    total: this.S.todos.length,
+                    done: this.S.todos.filter(t=>t.done).length
                 }
             }
         },
         storage: ['todos','inputText'],
         methods:{
             pressTodo(e){
-                if(e.keyCode == 13) this.addTodo()
+                if(e.keyCode == 13) this.M.addTodo()
             },
             addTodo(){
-                this.state.todos = [...this.state.todos,{
-                    text: this.state.inputText,
+                this.S.todos = [...this.S.todos,{
+                    text: this.S.inputText,
                     done: ''
                 }]
-                this.state.inputText = ''
+                this.S.inputText = ''
             },
             checkTodo(i){
-                this.state.todos[i].done = this.state.todos[i].done ? '' : 'checked' 
-                this.state.todos = this.state.todos
+                this.S.todos[i].done = this.S.todos[i].done ? '' : 'checked' 
+                this.S.todos = this.S.todos
             },
             removeTodo(i){
-                this.state.todos = this.state.todos.filter((t,ind)=>ind!=i)
+                this.S.todos = this.S.todos.filter((t,ind)=>ind!=i)
             }
-        }
+        },
+        render: /*html*/`
+        <h1>Todo App:</h1>
+        <input bind="inputText" onkeyup="pressTodo(event)">
+        <button onclick="addTodo()">Add Todo</button>
+        <ul class="todos">
+            Todos: {todosCount.done}/{todosCount.total}
+            <loop for="todos" as="todo" i="i">
+                <li>
+                    <input type="checkbox" {todo.done} onchange="checkTodo({i})">
+                    {todo.text}
+                    <if c="todo.done">
+                        <button onclick="removeTodo({i})">X</button>
+                    </if>
+                </li>
+            </loop>
+        </ul>
+        `
     })
 </script>
 </html>
